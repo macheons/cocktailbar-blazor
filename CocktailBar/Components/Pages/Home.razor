@@ -1,0 +1,173 @@
+@page "/"
+@rendermode InteractiveServer
+@inject CocktailService CocktailApi
+@inject FavoriteService Favorites
+@inject NavigationManager Nav
+
+<h1>&#127864; Bienvenue au CocktailBar</h1>
+
+<!-- Barre de recherche -->
+<div class="search-bar">
+    <input type="text" placeholder="Rechercher un cocktail..." @bind="searchTerm" @bind:event="oninput"
+           @onkeydown="HandleKeyDown" />
+    <button class="btn btn-primary" @onclick="Search">Rechercher</button>
+    <button class="btn btn-secondary" @onclick="RandomCocktail">&#127922; Cocktail Surprise</button>
+</div>
+
+<!-- Filtre par catégorie -->
+<div class="filter-bar">
+    <select @onchange="OnCategoryChanged">
+        <option value="">Toutes les catégories</option>
+        @foreach (var cat in categories)
+        {
+            <option value="@cat">@cat</option>
+        }
+    </select>
+</div>
+
+@if (isLoading)
+{
+    <p class="loading-text">Chargement...</p>
+}
+else if (errorMessage != null)
+{
+    <p class="error-text">@errorMessage</p>
+}
+else if (cocktails.Count == 0)
+{
+    <p class="empty-text">Aucun résultat trouvé.</p>
+}
+else
+{
+    <div class="cocktail-grid">
+        @foreach (var c in cocktails)
+        {
+            <div class="card" @onclick="() => GoToDetail(c.IdDrink)">
+                <img src="@c.StrDrinkThumb" alt="@c.StrDrink" />
+                <div class="card-body">
+                    <h3>@c.StrDrink</h3>
+                    <p class="card-category">@c.StrCategory</p>
+                    <div class="card-badges">
+                        @if (c.StrAlcoholic == "Alcoholic")
+                        {
+                            <span class="badge badge-alcoholic">Alcoholic</span>
+                        }
+                        else
+                        {
+                            <span class="badge badge-non-alcoholic">Non alcoholic</span>
+                        }
+                        @if (Favorites.IsFavorite(c.IdDrink))
+                        {
+                            <span class="badge badge-fav">&#11088;</span>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private string searchTerm = "";
+    private List<string> categories = new();
+    private List<CocktailDetail> cocktails = new();
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            categories = await CocktailApi.GetCategoriesAsync();
+            cocktails = await CocktailApi.SearchCocktailsAsync("a");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Erreur lors du chargement : {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void GoToDetail(string id)
+    {
+        Nav.NavigateTo($"/cocktail/{id}");
+    }
+
+    private async Task Search()
+    {
+        if (string.IsNullOrWhiteSpace(searchTerm)) return;
+
+        isLoading = true;
+        errorMessage = null;
+        try
+        {
+            cocktails = await CocktailApi.SearchCocktailsAsync(searchTerm);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Erreur : {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+            await Search();
+    }
+
+    private async Task OnCategoryChanged(ChangeEventArgs e)
+    {
+        var category = e.Value?.ToString();
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            if (string.IsNullOrEmpty(category))
+            {
+                cocktails = await CocktailApi.SearchCocktailsAsync("a");
+            }
+            else
+            {
+                var summaries = await CocktailApi.FilterByCategoryAsync(category);
+                var details = new List<CocktailDetail>();
+                foreach (var s in summaries.Take(20))
+                {
+                    var detail = await CocktailApi.GetCocktailByIdAsync(s.IdDrink);
+                    if (detail != null)
+                        details.Add(detail);
+                }
+                cocktails = details;
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Erreur : {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task RandomCocktail()
+    {
+        try
+        {
+            var random = await CocktailApi.GetRandomCocktailAsync();
+            if (random != null)
+                Nav.NavigateTo($"/cocktail/{random.IdDrink}");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Erreur : {ex.Message}";
+        }
+    }
+}
