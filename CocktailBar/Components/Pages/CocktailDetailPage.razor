@@ -1,0 +1,160 @@
+@page "/cocktail/{Id}"
+@rendermode InteractiveServer
+@inject CocktailService CocktailApi
+@inject FavoriteService Favorites
+@inject AuthService Auth
+@inject NavigationManager Nav
+
+@if (isLoading)
+{
+    <p class="loading-text">Chargement...</p>
+}
+else if (cocktail == null)
+{
+    <p class="error-text">Cocktail introuvable.</p>
+}
+else
+{
+    <div class="detail-header">
+        <div class="detail-info">
+            <h1>@cocktail.StrDrink</h1>
+            <p class="detail-meta">@cocktail.StrCategory</p>
+            <p class="detail-meta">
+                @if (cocktail.StrAlcoholic == "Alcoholic")
+                {
+                    <span class="badge badge-alcoholic">Alcoholic</span>
+                }
+                else
+                {
+                    <span class="badge badge-non-alcoholic">Non alcoholic</span>
+                }
+            </p>
+            <p class="detail-meta">&#129371; @cocktail.StrGlass</p>
+
+            <!-- Bouton favori -->
+            <div class="fav-actions">
+                @if (Auth.IsAuthenticated)
+                {
+                    @if (Favorites.IsFavorite(cocktail.IdDrink))
+                    {
+                        <button class="btn btn-danger" @onclick="RemoveFromFavorites">&#128148; Retirer des favoris</button>
+                        <a href="/favorites" class="btn btn-secondary">&#9999;&#65039; Modifier dans mes favoris</a>
+                    }
+                    else
+                    {
+                        <button class="btn btn-primary" @onclick="AddToFavorites">&#127865; Ajouter aux favoris</button>
+                    }
+                }
+                else
+                {
+                    <p class="login-hint">&#128274; <a href="/login">Connectez-vous</a> pour sauvegarder ce cocktail</p>
+                }
+            </div>
+
+            @if (flashMessage != null)
+            {
+                <p class="flash-message">@flashMessage</p>
+            }
+        </div>
+        <div class="detail-image">
+            <img src="@cocktail.StrDrinkThumb" alt="@cocktail.StrDrink" />
+        </div>
+    </div>
+
+    <!-- Ingrédients -->
+    <h2>Ingrédients</h2>
+    <div class="ingredients-list">
+        @foreach (var ing in cocktail.GetIngredients())
+        {
+            <div class="ingredient-item">
+                <img src="@ing.ImageUrl" alt="@ing.Name" />
+                <span class="ingredient-name">@ing.Name</span>
+                <span class="ingredient-measure">@ing.Measure</span>
+            </div>
+        }
+    </div>
+
+    <!-- Instructions -->
+    <h2>Instructions</h2>
+    <div class="instructions-block">
+        <p>@cocktail.StrInstructions</p>
+    </div>
+
+    <!-- Actions -->
+    <div class="detail-actions">
+        <button class="btn btn-secondary" @onclick="SimilarCocktail">&#127922; Cocktail similaire</button>
+        <button class="btn btn-secondary" @onclick="GoBack">&#8592; Retour</button>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public string Id { get; set; } = string.Empty;
+
+    private CocktailDetail? cocktail;
+    private bool isLoading = true;
+    private string? flashMessage;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        isLoading = true;
+        flashMessage = null;
+        try
+        {
+            cocktail = await CocktailApi.GetCocktailByIdAsync(Id);
+        }
+        catch
+        {
+            cocktail = null;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void GoBack()
+    {
+        Nav.NavigateTo("/");
+    }
+
+    private async Task AddToFavorites()
+    {
+        if (cocktail == null) return;
+        Favorites.Add(cocktail);
+        flashMessage = "Ajouté aux favoris !";
+        await ShowFlash();
+    }
+
+    private async Task RemoveFromFavorites()
+    {
+        if (cocktail == null) return;
+        Favorites.Remove(cocktail.IdDrink);
+        flashMessage = "Retiré des favoris.";
+        await ShowFlash();
+    }
+
+    private async Task ShowFlash()
+    {
+        StateHasChanged();
+        await Task.Delay(2000);
+        flashMessage = null;
+        StateHasChanged();
+    }
+
+    private async Task SimilarCocktail()
+    {
+        if (cocktail == null) return;
+        try
+        {
+            var similar = await CocktailApi.FilterByCategoryAsync(cocktail.StrCategory);
+            if (similar.Count > 0)
+            {
+                var rng = new Random();
+                var pick = similar[rng.Next(similar.Count)];
+                Nav.NavigateTo($"/cocktail/{pick.IdDrink}", forceLoad: false);
+            }
+        }
+        catch { }
+    }
+}
