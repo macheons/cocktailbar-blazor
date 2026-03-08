@@ -1,0 +1,124 @@
+@page "/favorites"
+@rendermode InteractiveServer
+@inject FavoriteService FavService
+@inject AuthService Auth
+@inject NavigationManager Nav
+@implements IDisposable
+
+<h1>&#127865; Mes Favoris (@FavService.Count)</h1>
+
+@if (!Auth.IsAuthenticated)
+{
+    <div class="not-auth-message">
+        <p>Vous devez être connecté pour voir vos favoris.</p>
+        <button class="btn btn-primary" @onclick="GoToLogin">Se connecter</button>
+    </div>
+}
+else if (FavService.Count == 0)
+{
+    <div class="empty-favs">
+        <p>Vous n'avez pas encore de favoris.</p>
+        <button class="btn btn-primary" @onclick="GoToHome">Découvrir des cocktails</button>
+    </div>
+}
+else
+{
+    <div class="favorites-grid">
+        @foreach (var fav in FavService.GetAll())
+        {
+            <div class="card fav-card">
+                <img src="@fav.ImageUrl" alt="@fav.DisplayName"
+                     @onclick="() => GoToDetail(fav.CocktailId)" style="cursor:pointer;" />
+                <div class="card-body">
+                    @if (editingId == fav.CocktailId)
+                    {
+                        <!-- Mode édition -->
+                        <div class="edit-form">
+                            <input type="text" placeholder="@fav.OriginalName" @bind="editCustomName" />
+                            <textarea placeholder="Notes personnelles..." @bind="editNotes"></textarea>
+                            <div class="star-rating">
+                                @for (int i = 1; i <= 5; i++)
+                                {
+                                    var star = i;
+                                    <button class="@StarBtnClass(star)"
+                                            @onclick="() => editRating = star">
+                                        @(star <= editRating ? "\u2605" : "\u2606")
+                                    </button>
+                                }
+                            </div>
+                            <div class="edit-actions">
+                                <button class="btn btn-primary" @onclick="() => SaveEdit(fav.CocktailId)">&#128190; Sauvegarder</button>
+                                <button class="btn btn-secondary" @onclick="CancelEdit">Annuler</button>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <!-- Mode affichage -->
+                        <h3>@fav.DisplayName</h3>
+                        <p class="fav-rating">@fav.RatingStars</p>
+                        @if (!string.IsNullOrWhiteSpace(fav.PersonalNotes))
+                        {
+                            <p class="fav-notes">@fav.PersonalNotes</p>
+                        }
+                        <p class="fav-category">@fav.Category</p>
+                        <p class="fav-date">Ajouté le @fav.AddedAt.ToString("dd/MM/yyyy")</p>
+                        <div class="fav-actions">
+                            <button class="btn btn-secondary" @onclick="() => StartEdit(fav)">&#9999;&#65039; Modifier</button>
+                            <button class="btn btn-danger" @onclick="() => RemoveFav(fav.CocktailId)">&#128465;&#65039; Supprimer</button>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private string? editingId;
+    private string editCustomName = "";
+    private string editNotes = "";
+    private int editRating = 0;
+
+    protected override void OnInitialized()
+    {
+        FavService.OnChange += OnStateChanged;
+    }
+
+    private void GoToLogin() => Nav.NavigateTo("/login");
+    private void GoToHome() => Nav.NavigateTo("/");
+    private void GoToDetail(string id) => Nav.NavigateTo($"/cocktail/{id}");
+    private void RemoveFav(string id) => FavService.Remove(id);
+
+    private string StarBtnClass(int star) =>
+        star <= editRating ? "star-btn active" : "star-btn";
+
+    private void StartEdit(Favorite fav)
+    {
+        editingId = fav.CocktailId;
+        editCustomName = fav.CustomName;
+        editNotes = fav.PersonalNotes;
+        editRating = fav.Rating;
+    }
+
+    private void SaveEdit(string cocktailId)
+    {
+        FavService.Update(cocktailId, editCustomName, editNotes, editRating);
+        editingId = null;
+    }
+
+    private void CancelEdit()
+    {
+        editingId = null;
+    }
+
+    private void OnStateChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        FavService.OnChange -= OnStateChanged;
+    }
+}
