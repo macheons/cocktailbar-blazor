@@ -1,0 +1,68 @@
+<!-- === Login.razor === -->
+@page "/login"
+@rendermode InteractiveServer
+@inject AuthService Auth
+@inject NavigationManager Nav
+
+<h1>&#128274; Connexion</h1>
+
+@if (Auth.IsAuthenticated)
+{
+    <div class="logged-in">
+        <p>Bonsoir, @Auth.CurrentUser &#127864;</p>
+        <button class="btn btn-danger" @onclick="Logout">Se déconnecter</button>
+    </div>
+}
+else
+{
+    <div class="login-form">
+        <p class="hint-text">Comptes : james/bond007 | martini/shaken | bar/tender</p>
+
+        <div class="form-group">
+            <label>Nom d'utilisateur</label>
+            <input type="text" @bind="username" @bind:event="oninput" @onkeydown="HandleKeyDown" />
+        </div>
+
+        <div class="form-group">
+            <label>Mot de passe</label>
+            <input type="password" @bind="password" @bind:event="oninput" @onkeydown="HandleKeyDown" />
+        </div>
+
+        @if (errorMessage != null)
+        {
+            <p class="error-text">@errorMessage</p>
+        }
+
+        <button class="btn btn-primary" @onclick="HandleLogin">Se connecter</button>
+    </div>
+}
+
+@code {
+    private string username = "";
+    private string password = "";
+    private string? errorMessage;
+
+    private void HandleLogin()
+    {
+        errorMessage = null;
+        if (Auth.Login(username, password))
+        {
+            Nav.NavigateTo("/favorites");
+        }
+        else
+        {
+            errorMessage = "Identifiants incorrects.";
+        }
+    }
+
+    private void HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+            HandleLogin();
+    }
+
+    private void Logout()
+    {
+        Auth.Logout();
+    }
+}
