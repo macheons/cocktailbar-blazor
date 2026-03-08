@@ -1,0 +1,57 @@
+<!-- === NavMenu.razor === -->
+@implements IDisposable
+@inject AuthService Auth
+@inject FavoriteService Favorites
+@inject NavigationManager Nav
+
+<div class="nav-menu">
+    <div class="nav-brand" @onclick="GoHome">
+        <span class="brand-icon">&#127864;</span> CocktailBar
+    </div>
+
+    <nav>
+        <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+            &#127968; Accueil
+        </NavLink>
+
+        <NavLink class="nav-link" href="favorites">
+            &#127865; Mes Favoris
+            @if (Favorites.Count > 0)
+            {
+                <span class="badge-count">@Favorites.Count</span>
+            }
+        </NavLink>
+
+        <NavLink class="nav-link" href="login">
+            @if (Auth.IsAuthenticated)
+            {
+                <span>&#128100; @Auth.CurrentUser</span>
+            }
+            else
+            {
+                <span>&#128274; Connexion</span>
+            }
+        </NavLink>
+    </nav>
+</div>
+
+@code {
+    protected override void OnInitialized()
+    {
+        Auth.OnAuthChanged += OnStateChanged;
+        Favorites.OnChange += OnStateChanged;
+    }
+
+    private void GoHome() => Nav.NavigateTo("/");
+
+    private void OnStateChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        Auth.OnAuthChanged -= OnStateChanged;
+        Favorites.OnChange -= OnStateChanged;
+    }
+}
